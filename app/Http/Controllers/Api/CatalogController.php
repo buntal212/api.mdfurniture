@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CatalogController extends Controller
 {
@@ -55,5 +57,14 @@ class CatalogController extends Controller
             ]);
 
         return response()->json($products);
+    }
+
+    public function thumbnail(string $filename): StreamedResponse
+    {
+        $path = "products/thumbnails/{$filename}";
+
+        abort_unless(Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->response($path);
     }
 }

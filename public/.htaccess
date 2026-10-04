@@ -23,3 +23,11 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Foto produk menggunakan nama file hash, sehingga URL berubah setiap kali file baru diunggah.
+# Cache jangka panjang menghindari unduhan ulang thumbnail pada kunjungan berikutnya.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(?:avif|gif|jpe?g|png|svg|webp)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>

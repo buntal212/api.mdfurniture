@@ -23,6 +23,9 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v2/catalog')->middleware('throttle:60,1')->group(function () {
     Route::get('/categories', [CatalogController::class, 'categories']);
     Route::get('/products', [CatalogController::class, 'products']);
+    Route::get('/thumbnails/{filename}', [CatalogController::class, 'thumbnail'])
+        ->where('filename', '[A-Za-z0-9_-]+\\.webp')
+        ->middleware('cache.headers:public;max_age=31536000;immutable');
 });
 
 Route::get('/user', function (Request $request) {

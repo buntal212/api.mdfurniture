@@ -44,7 +44,7 @@ class ProductImage extends Model
             return Storage::disk('public')->url($path);
         }
 
-        return request()->getSchemeAndHttpHost().'/storage/'.$path;
+        return request()->getSchemeAndHttpHost().'/api/v2/catalog/thumbnails/'.rawurlencode(basename($path));
     }
 
     public function thumbnailPath(): string
