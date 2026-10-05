@@ -18,6 +18,9 @@ Route::prefix('v1')->group(function () {
     Route::apiResource('products', ProductController::class)
         ->middleware('auth:sanctum');
 
+    Route::delete('products/{product}/images/{image}', [ProductController::class, 'destroyImage'])
+        ->middleware('auth:sanctum');
+
 });
 
 Route::prefix('v2/catalog')->middleware('throttle:60,1')->group(function () {

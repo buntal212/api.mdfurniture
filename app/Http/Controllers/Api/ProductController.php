@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
+use App\Models\ProductImage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,6 +90,25 @@ class ProductController extends Controller
         $product->delete();
 
         return response()->json(['message' => 'Produk berhasil dihapus.']);
+    }
+
+    public function destroyImage(Product $product, ProductImage $image): JsonResponse
+    {
+        abort_unless((string) $image->product_id === (string) $product->getKey(), 404);
+
+        $wasPrimary = $image->is_primary;
+
+        Storage::disk('public')->delete([$image->image, $image->thumbnailPath()]);
+        $image->delete();
+
+        if ($wasPrimary) {
+            $product->images()->first()?->update(['is_primary' => true]);
+        }
+
+        return response()->json([
+            'message' => 'Foto produk berhasil dihapus.',
+            'data' => $product->fresh()->load(['category:id,nama', 'images']),
+        ]);
     }
 
     /** @param array<string, mixed> $data
