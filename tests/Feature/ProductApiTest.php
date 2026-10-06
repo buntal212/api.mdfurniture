@@ -46,5 +46,11 @@ class ProductApiTest extends TestCase
         $this->assertSame(1200, $dimensions[0]);
         $this->assertSame(1500, $dimensions[1]);
         $this->assertSame(IMAGETYPE_WEBP, $dimensions[2]);
+
+        $processedImage = imagecreatefromstring(Storage::disk('public')->get($image->image));
+        $watermarkColor = imagecolorsforindex($processedImage, imagecolorat($processedImage, 1198, 1498));
+
+        $this->assertLessThan(230, $watermarkColor['red']);
+        imagedestroy($processedImage);
     }
 }

@@ -10,6 +10,8 @@ use RuntimeException;
 
 class ProductImageService
 {
+    private const string WatermarkText = 'md furni and craft probolinggo';
+
     private const int CanvasWidth = 1200;
 
     private const int CanvasHeight = 1500;
@@ -30,11 +32,13 @@ class ProductImageService
         $disk = Storage::disk('public');
 
         try {
+            $thumbnail = $this->createThumbnail($normalizedImage);
+            $this->watermark($normalizedImage);
+            $this->watermark($thumbnail);
+
             if (! $disk->put($path, $this->encodeWebp($normalizedImage, self::WebpQuality))) {
                 throw new RuntimeException('Gambar produk tidak dapat disimpan.');
             }
-
-            $thumbnail = $this->createThumbnail($normalizedImage);
 
             if (! $disk->put($thumbnailPath, $this->encodeWebp($thumbnail, self::WebpQuality))) {
                 $disk->delete($path);
@@ -182,6 +186,37 @@ class ProductImageService
         imagefill($canvas, 0, 0, $white);
 
         return $canvas;
+    }
+
+    private function watermark(GdImage $image): void
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $padding = max(4, min(16, (int) round(min($width, $height) * 0.02)));
+        $font = 5;
+
+        while ($font > 1 && imagefontwidth($font) * strlen(self::WatermarkText) > $width - ($padding * 2)) {
+            $font--;
+        }
+
+        $textWidth = imagefontwidth($font) * strlen(self::WatermarkText);
+        $textHeight = imagefontheight($font);
+        $x = max($padding, $width - $textWidth - $padding);
+        $y = max($padding, $height - $textHeight - $padding);
+
+        imagealphablending($image, true);
+
+        $background = imagecolorallocatealpha($image, 0, 0, 0, 72);
+        $textColor = imagecolorallocatealpha($image, 255, 232, 190, 10);
+        imagefilledrectangle(
+            $image,
+            max(0, $x - $padding),
+            max(0, $y - $padding),
+            min($width - 1, $x + $textWidth + $padding),
+            min($height - 1, $y + $textHeight + $padding),
+            $background,
+        );
+        imagestring($image, $font, $x, $y, self::WatermarkText, $textColor);
     }
 
     private function encodeWebp(GdImage $image, int $quality): string
