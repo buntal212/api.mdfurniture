@@ -7,6 +7,7 @@ use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Services\ProductImageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
-    private const string WatermarkText = 'md furni and craft probolinggo';
+    public function __construct(private ProductImageService $productImageService) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -130,109 +131,15 @@ class ProductController extends Controller
         $nextOrder = (int) $product->images()->max('urutan') + 1;
 
         foreach ($files as $index => $file) {
-            $path = $file->store('products', 'public');
-            $this->watermarkImage($path);
+            $storedImage = $this->productImageService->store($file);
 
-            $image = $product->images()->create([
-                'image' => $path,
+            $product->images()->create([
+                'image' => $storedImage['image'],
                 'alt_text' => $product->nama,
                 'is_primary' => $product->images()->doesntExist() && $index === 0,
                 'urutan' => $nextOrder + $index,
             ]);
-
-            $this->createThumbnail($path, $image->thumbnailPath());
         }
-    }
-
-    private function createThumbnail(string $sourcePath, string $thumbnailPath): void
-    {
-        if (! function_exists('imagewebp')) {
-            return;
-        }
-
-        $source = @imagecreatefromstring(Storage::disk('public')->get($sourcePath));
-
-        if ($source === false) {
-            return;
-        }
-
-        $sourceWidth = imagesx($source);
-        $sourceHeight = imagesy($source);
-        $scale = min(1, 480 / max($sourceWidth, $sourceHeight));
-        $width = max(1, (int) round($sourceWidth * $scale));
-        $height = max(1, (int) round($sourceHeight * $scale));
-        $thumbnail = imagecreatetruecolor($width, $height);
-
-        imagealphablending($thumbnail, false);
-        imagesavealpha($thumbnail, true);
-        $transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
-        imagefill($thumbnail, 0, 0, $transparent);
-        imagecopyresampled($thumbnail, $source, 0, 0, 0, 0, $width, $height, $sourceWidth, $sourceHeight);
-
-        ob_start();
-        imagewebp($thumbnail, null, 70);
-        $contents = ob_get_clean();
-
-        if ($contents !== false) {
-            Storage::disk('public')->put($thumbnailPath, $contents);
-            $this->watermarkImage($thumbnailPath);
-        }
-
-        imagedestroy($source);
-        imagedestroy($thumbnail);
-    }
-
-    private function watermarkImage(string $path): void
-    {
-        $disk = Storage::disk('public');
-        $image = @imagecreatefromstring($disk->get($path));
-
-        if ($image === false) {
-            return;
-        }
-
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $padding = max(4, min(16, (int) round(min($width, $height) * 0.02)));
-        $font = 5;
-
-        while ($font > 1 && imagefontwidth($font) * strlen(self::WatermarkText) > $width - ($padding * 2)) {
-            $font--;
-        }
-
-        $textWidth = imagefontwidth($font) * strlen(self::WatermarkText);
-        $textHeight = imagefontheight($font);
-        $x = max($padding, $width - $textWidth - $padding);
-        $y = max($padding, $height - $textHeight - $padding);
-
-        imagealphablending($image, true);
-
-        $background = imagecolorallocatealpha($image, 0, 0, 0, 72);
-        $textColor = imagecolorallocatealpha($image, 255, 232, 190, 10);
-        imagefilledrectangle(
-            $image,
-            max(0, $x - $padding),
-            max(0, $y - $padding),
-            min($width - 1, $x + $textWidth + $padding),
-            min($height - 1, $y + $textHeight + $padding),
-            $background,
-        );
-        imagestring($image, $font, $x, $y, self::WatermarkText, $textColor);
-
-        ob_start();
-        $written = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
-            'jpg', 'jpeg' => imagejpeg($image, null, 85),
-            'png' => imagepng($image, null, 6),
-            'webp' => imagewebp($image, null, 80),
-            default => false,
-        };
-        $contents = ob_get_clean();
-
-        if ($written && $contents !== false) {
-            $disk->put($path, $contents);
-        }
-
-        imagedestroy($image);
     }
 
     private function generateCode(): string
